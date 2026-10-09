@@ -1,22 +1,27 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using RealEstateApi.Data;
 using RealEstateApi.DTOs;
 using RealEstateApi.Models;
-using System.Linq;
 
 namespace RealEstateApi.Controllers;
 
 [ApiController]
-[Route("api/[controller]")] // Routing: /api/properties
+[Route("api/[controller]")]
 public class PropertiesController : ControllerBase
 {
-    // GET: api/properties?maxPrice=100000&minRooms=2
+    private readonly ApplicationDbContext _context;
+
+    public PropertiesController(ApplicationDbContext context)
+    {
+        _context = context;
+    }
+
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public IActionResult GetProperties([FromQuery] PropertyQueryParameters parameters) // Model binding для Query
+    public async Task<IActionResult> GetProperties([FromQuery] PropertyQueryParameters parameters)
     {
-        // Звертаємось безпосередньо до статичного списку
-        var query = MockDatabase.Properties.AsEnumerable();
+        var query = _context.Properties.AsQueryable();
 
         if (parameters.MaxPrice.HasValue)
             query = query.Where(p => p.Price <= parameters.MaxPrice.Value);
@@ -27,83 +32,75 @@ public class PropertiesController : ControllerBase
         if (parameters.IsAvailable.HasValue)
             query = query.Where(p => p.IsAvailable == parameters.IsAvailable.Value);
 
-        return Ok(query.ToList()); // 200 OK
+        var properties = await query.ToListAsync();
+        return Ok(properties);
     }
 
-    // GET: api/properties/1
-    [HttpGet("{id}")] // Route parameter
+    [HttpGet("{id}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public IActionResult GetProperty(int id)
+    public async Task<IActionResult> GetProperty(int id)
     {
-        // Шукаємо об'єкт у звичайному списку
-        var property = MockDatabase.Properties.FirstOrDefault(p => p.Id == id);
+        var property = await _context.Properties.FindAsync(id);
 
-        if (property != null)
-            return Ok(property); // 200 OK
+        if (property == null)
+            return NotFound();
 
-        return NotFound(new { Message = $"Об'єкт з ID {id} не знайдено." }); // 404 Not Found
+        return Ok(property);
     }
 
-    // POST: api/properties
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public IActionResult CreateProperty([FromBody] PropertyDto dto) // Model binding для Body
+    public async Task<IActionResult> CreateProperty([FromBody] PropertyDto dto)
     {
-        // Генеруємо новий ID (якщо список порожній, ставимо 1)
-        var newId = MockDatabase.Properties.Any() ? MockDatabase.Properties.Max(p => p.Id) + 1 : 1;
-
         var newProperty = new Property
         {
-            Id = newId,
             Address = dto.Address,
             Price = dto.Price,
             RoomsCount = dto.RoomsCount,
             IsAvailable = dto.IsAvailable
         };
 
-        MockDatabase.Properties.Add(newProperty);
+        await _context.Properties.AddAsync(newProperty);
+        await _context.SaveChangesAsync();
 
-        // 201 Created з Location header
         return CreatedAtAction(nameof(GetProperty), new { id = newProperty.Id }, newProperty);
     }
 
-    // PUT: api/properties/1
     [HttpPut("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public IActionResult UpdateProperty(int id, [FromBody] PropertyDto dto)
+    public async Task<IActionResult> UpdateProperty(int id, [FromBody] PropertyDto dto)
     {
-        var existingProperty = MockDatabase.Properties.FirstOrDefault(p => p.Id == id);
+        var existingProperty = await _context.Properties.FindAsync(id);
 
         if (existingProperty == null)
-            return NotFound(); // 404 Not Found
+            return NotFound();
 
-        // Оновлюємо властивості знайденого об'єкта
         existingProperty.Address = dto.Address;
         existingProperty.Price = dto.Price;
         existingProperty.RoomsCount = dto.RoomsCount;
         existingProperty.IsAvailable = dto.IsAvailable;
 
-        return NoContent(); // 204 No Content
+        await _context.SaveChangesAsync();
+
+        return NoContent();
     }
 
-    // DELETE: api/properties/1
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public IActionResult DeleteProperty(int id)
+    public async Task<IActionResult> DeleteProperty(int id)
     {
-        var propertyToRemove = MockDatabase.Properties.FirstOrDefault(p => p.Id == id);
+        var property = await _context.Properties.FindAsync(id);
 
-        if (propertyToRemove != null)
-        {
-            MockDatabase.Properties.Remove(propertyToRemove);
-            return NoContent(); // 204 No Content
-        }
+        if (property == null)
+            return NotFound();
 
-        return NotFound(); // 404 Not Found
+        _context.Properties.Remove(property);
+        await _context.SaveChangesAsync();
+
+        return NoContent();
     }
 }
