@@ -1,7 +1,7 @@
 using System.Linq.Expressions;
 using RealEstateApi.DTOs.Agents;
 using RealEstateApi.DTOs.Clients;
-using RealEstateApi.DTOs.Common;
+using RealEstateApi.DTOs.Deals;
 using RealEstateApi.Models;
 
 namespace RealEstateApi.Mappings;

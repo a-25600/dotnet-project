@@ -2,10 +2,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RealEstateApi.Data;
 using RealEstateApi.DTOs.Agents;
-using RealEstateApi.Models;
+using RealEstateApi.Mappings;
 
 namespace RealEstateApi.Controllers;
 
+/// <summary>
+/// Керування ріелторами агентства.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class AgentsController : ControllerBase
@@ -17,20 +20,14 @@ public class AgentsController : ControllerBase
         _context = context;
     }
 
-    private static AgentDto ToDto(Agent agent) => new()
-    {
-        Id = agent.Id,
-        FullName = agent.FullName,
-        Email = agent.Email,
-        PhoneNumber = agent.PhoneNumber,
-        LicenseNumber = agent.LicenseNumber,
-        IsActive = agent.IsActive
-    };
-
+    /// <summary>
+    /// Список ріелторів із фільтром, пошуком і сортуванням.
+    /// </summary>
     [HttpGet]
+    [ProducesResponseType(typeof(List<AgentDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAgents([FromQuery] AgentQueryParameters parameters)
     {
-        var query = _context.Agents.AsQueryable();
+        var query = _context.Agents.AsNoTracking().AsQueryable();
 
         if (parameters.IsActive.HasValue)
             query = query.Where(a => a.IsActive == parameters.IsActive.Value);
@@ -65,63 +62,104 @@ public class AgentsController : ControllerBase
         };
 
         var agents = await query.ToListAsync();
-        return Ok(agents.Select(ToDto).ToList());
+        return Ok(agents.Select(a => a.ToDto()).ToList());
     }
 
+    /// <summary>
+    /// Ріелтор за ідентифікатором разом зі списком його угод.
+    /// </summary>
     [HttpGet("{id}")]
+    [ProducesResponseType(typeof(AgentDetailsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetAgentById(int id)
+    {
+        var agent = await _context.Agents.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id);
+
+        if (agent == null)
+            return NotFound(new { message = $"Agent with id {id} not found" });
+
+        var deals = await _context.Deals
+            .AsNoTracking()
+            .Where(d => d.RealtorId == id)
+            .OrderByDescending(d => d.Date)
+            .Select(MappingExtensions.DealToSummary)
+            .ToListAsync();
+
+        return Ok(agent.ToDetailsDto(deals));
+    }
+
+    /// <summary>
+    /// Створити ріелтора.
+    /// </summary>
+    [HttpPost]
+    [ProducesResponseType(typeof(AgentDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CreateAgent([FromBody] CreateAgentDto dto)
+    {
+        var email = MappingExtensions.NormalizeEmail(dto.Email);
+        var license = dto.LicenseNumber.Trim();
+
+        if (await _context.Agents.AnyAsync(a => a.Email.ToLower() == email))
+            return Conflict(new { message = $"Agent with email '{email}' already exists" });
+
+        if (await _context.Agents.AnyAsync(a => a.LicenseNumber == license))
+            return Conflict(new { message = $"Agent with license '{license}' already exists" });
+
+        var newAgent = dto.ToEntity();
+
+        _context.Agents.Add(newAgent);
+        await _context.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetAgentById), new { id = newAgent.Id }, newAgent.ToDto());
+    }
+
+    /// <summary>
+    /// Оновити дані ріелтора.
+    /// </summary>
+    [HttpPut("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdateAgent(int id, [FromBody] UpdateAgentDto dto)
     {
         var agent = await _context.Agents.FindAsync(id);
 
         if (agent == null)
             return NotFound(new { message = $"Agent with id {id} not found" });
 
-        return Ok(ToDto(agent));
-    }
+        var email = MappingExtensions.NormalizeEmail(dto.Email);
+        var license = dto.LicenseNumber.Trim();
 
-    [HttpPost]
-    public async Task<IActionResult> CreateAgent([FromBody] CreateAgentDto dto)
-    {
-        var newAgent = new Agent
-        {
-            FullName = dto.FullName,
-            Email = dto.Email,
-            PhoneNumber = dto.PhoneNumber,
-            LicenseNumber = dto.LicenseNumber,
-            IsActive = true
-        };
+        if (await _context.Agents.AnyAsync(a => a.Id != id && a.Email.ToLower() == email))
+            return Conflict(new { message = $"Agent with email '{email}' already exists" });
 
-        _context.Agents.Add(newAgent);
+        if (await _context.Agents.AnyAsync(a => a.Id != id && a.LicenseNumber == license))
+            return Conflict(new { message = $"Agent with license '{license}' already exists" });
+
+        agent.UpdateFrom(dto);
         await _context.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(GetAgentById), new { id = newAgent.Id }, ToDto(newAgent));
-    }
-
-    [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateAgent(int id, [FromBody] UpdateAgentDto dto)
-    {
-        var agent = await _context.Agents.FindAsync(id);
-
-        if (agent == null)
-            return NotFound();
-
-        agent.FullName = dto.FullName;
-        agent.Email = dto.Email;
-        agent.PhoneNumber = dto.PhoneNumber;
-        agent.LicenseNumber = dto.LicenseNumber;
-        agent.IsActive = dto.IsActive;
-
-        await _context.SaveChangesAsync();
         return NoContent();
     }
 
+    /// <summary>
+    /// Видалити ріелтора.
+    /// </summary>
     [HttpDelete("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> DeleteAgent(int id)
     {
         var agent = await _context.Agents.FindAsync(id);
 
         if (agent == null)
-            return NotFound();
+            return NotFound(new { message = $"Agent with id {id} not found" });
+
+        if (await _context.Deals.AnyAsync(d => d.RealtorId == id))
+            return Conflict(new { message = "Agent has deals and cannot be deleted. Set isActive to false instead" });
 
         _context.Agents.Remove(agent);
         await _context.SaveChangesAsync();

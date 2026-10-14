@@ -1,4 +1,4 @@
-using RealEstateApi.DTOs.Common;
+using RealEstateApi.DTOs.Deals;
 
 namespace RealEstateApi.DTOs.Agents;
 
