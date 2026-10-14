@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using RealEstateApi.Data;
 using RealEstateApi.DTOs.Deals;
 using RealEstateApi.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace RealEstateApi.Controllers;
 
@@ -10,37 +11,52 @@ namespace RealEstateApi.Controllers;
 
 public class DealsController : ControllerBase
 {
+
+    private readonly ApplicationDbContext _context;
+    public DealsController(ApplicationDbContext context)
+    {
+        _context = context;
+    }
+
     // GET: api/deals
     [HttpGet]
-    public IActionResult GetAllDeals([FromQuery] string? status)
+    public async Task<IActionResult> GetAllDeals([FromQuery] string? status)
     {
-        var deals = MockDatabase.Deals.AsQueryable();
+        var query = _context.Deals
+            .Include(d => d.Property)
+            .Include(d => d.Client)
+            .AsQueryable();
 
         if (!string.IsNullOrEmpty(status))
         {
-            deals = deals.Where(deals => deals.Status.Equals(status, StringComparison.OrdinalIgnoreCase));
+            query = query.Where(d => d.Status.Equals(status, StringComparison.OrdinalIgnoreCase));
         }
 
-        return Ok(deals.ToList());
+        var deals = await query.ToListAsync();
+        return Ok(deals);
     }
 
+    // GET: api/deals/5
     [HttpGet("{id}")]
-    public IActionResult GetDealById(int id) 
+    public async Task<IActionResult> GetDealById(int id)
     {
-        var deal = MockDatabase.Deals.FirstOrDefault(deal => deal.Id == id);
+        var deal = await _context.Deals
+            .Include(d => d.Property)
+            .Include(d => d.Client)
+            .FirstOrDefaultAsync(d => d.Id == id);
 
         if (deal == null)
-            return NotFound(new { message = $"Deal with kd {id} not found" });
+            return NotFound(new { message = $"Deal with id {id} not found" });
 
         return Ok(deal);
     }
 
+    // POST: api/deals
     [HttpPost]
-    public IActionResult CreateDeal([FromBody] CreateDealDto dto)
+    public async Task<IActionResult> CreateDeal([FromBody] CreateDealDto dto)
     {
         var newDeal = new Deal
         {
-            Id = MockDatabase.Deals.Any() ? MockDatabase.Deals.Max(d => d.Id) + 1 : 1,
             PropertyId = dto.PropertyId,
             ClientId = dto.ClientId,
             RealtorId = dto.RealtorId,
@@ -49,15 +65,17 @@ public class DealsController : ControllerBase
             Status = "Pending"
         };
 
-        MockDatabase.Deals.Add(newDeal);
+        _context.Deals.Add(newDeal);
+        await _context.SaveChangesAsync();
 
         return CreatedAtAction(nameof(GetDealById), new { id = newDeal.Id }, newDeal);
     }
 
+    // PUT: api/deals/5'
     [HttpPut("{id}")]
-    public IActionResult UpdateDeal(int id, [FromBody] UpdateDealDto dto)
+    public async Task<IActionResult> UpdateDeal(int id, [FromBody] UpdateDealDto dto)
     {
-        var deal = MockDatabase.Deals.FirstOrDefault(d => d.Id == id);
+        var deal = await _context.Deals.FindAsync(id);
 
         if (deal == null)
             return NotFound();
@@ -65,18 +83,21 @@ public class DealsController : ControllerBase
         deal.Price = dto.Price;
         deal.Status = dto.Status;
 
+        await _context.SaveChangesAsync();
         return NoContent();
     }
 
+    // DELETE: api/deals/5
     [HttpDelete("{id}")]
-    public IActionResult DeleteDeal(int id)
+    public async Task<IActionResult> DeleteDeal(int id)
     {
-        var deal = MockDatabase.Deals.FirstOrDefault(d => d.Id == id);
+        var deal = await _context.Deals.FindAsync(id);
 
         if (deal == null)
             return NotFound();
 
-        MockDatabase.Deals.Remove(deal);
+        _context.Deals.Remove(deal);
+        await _context.SaveChangesAsync();
 
         return NoContent();
     }

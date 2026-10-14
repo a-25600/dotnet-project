@@ -10,6 +10,9 @@ public class ApplicationDbContext : DbContext
     }
 
     public DbSet<Property> Properties { get; set; }
+    public DbSet<Deal> Deals { get; set; }
+    public DbSet<Agent> Agents { get; set; }
+    public DbSet<Client> Clients { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -27,6 +30,48 @@ public class ApplicationDbContext : DbContext
 
             entity.Property(p => p.Price)
                   .HasColumnType("decimal(18,2)");
+        });
+
+        modelBuilder.Entity<Client>(entity =>
+        {
+            entity.ToTable("Clients");
+
+            entity.HasKey(c => c.Id);
+
+            entity.Property(c => c.FullName)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+            entity.Property(c => c.Email)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+            entity.Property(c => c.PhoneNumber)
+                  .IsRequired()
+                  .HasMaxLength(30);
+        });
+
+        modelBuilder.Entity<Agent>(entity =>
+        {
+            entity.ToTable("Agents");
+
+            entity.HasKey(a => a.Id);
+
+            entity.Property(a => a.FullName)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+            entity.Property(a => a.Email)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+            entity.Property(a => a.PhoneNumber)
+                  .IsRequired()
+                  .HasMaxLength(30);
+
+            entity.Property(a => a.LicenseNumber)
+                  .IsRequired()
+                  .HasMaxLength(50);
         });
     }
 }
