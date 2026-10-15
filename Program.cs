@@ -1,8 +1,8 @@
+using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
 using RealEstateApi.Data;
 using RealEstateApi.Middleware;
-using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,11 +11,19 @@ builder.Services.AddEndpointsApiExplorer();
 
 builder.Services.AddSwaggerGen(options =>
 {
-    options.SwaggerDoc("v1", new OpenApiInfo { Title = "Real Estate API", Version = "v1" });
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Real Estate Agency REST API",
+        Version = "v1",
+        Description = "RESTful API для агентства нерухомості з підтримкою об'єктів нерухомості, клієнтів, ріелторів та угод."
+    });
 
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-    options.IncludeXmlComments(xmlPath);
+    if (File.Exists(xmlPath))
+    {
+        options.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
+    }
 });
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -23,15 +31,26 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 var app = builder.Build();
 
-app.UseMiddleware<ExceptionMiddleware>();
+// Автоматичне застосування міграцій при запуску
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    dbContext.Database.Migrate();
+}
 
+// Централізована обробка помилок та логування
+app.UseMiddleware<ExceptionMiddleware>();
 app.UseMiddleware<LoggingMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Real Estate API v1");
+    });
 }
 
 app.MapControllers();
+
 app.Run();

@@ -7,7 +7,7 @@ using RealEstateApi.Mappings;
 namespace RealEstateApi.Controllers;
 
 /// <summary>
-/// Керування клієнтами агентства.
+/// Керування клієнтами агентства нерухомості.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
@@ -21,9 +21,9 @@ public class ClientsController : ControllerBase
     }
 
     /// <summary>
-    /// Список клієнтів із пошуком і сортуванням.
+    /// Отримати список клієнтів із пошуком і сортуванням.
     /// </summary>
-    /// <param name="parameters">search - ПІБ, email або телефон; sortBy - id, email, phone, name (за замовчуванням); sortOrder - asc або desc.</param>
+    /// <param name="parameters">Параметри запиту: search (ПІБ, email, телефон), sortBy (name, email, phone, id), sortOrder (asc, desc).</param>
     /// <response code="200">Список клієнтів.</response>
     [HttpGet]
     [ProducesResponseType(typeof(List<ClientDto>), StatusCodes.Status200OK)]
@@ -58,12 +58,12 @@ public class ClientsController : ControllerBase
     }
 
     /// <summary>
-    /// Клієнт за ідентифікатором разом зі списком його угод.
+    /// Отримати клієнта за ідентифікатором разом зі списком його угод.
     /// </summary>
     /// <param name="id">Ідентифікатор клієнта.</param>
     /// <response code="200">Клієнт із вкладеними угодами.</response>
     /// <response code="404">Клієнта не знайдено.</response>
-    [HttpGet("{id}")]
+    [HttpGet("{id:int}")]
     [ProducesResponseType(typeof(ClientDetailsDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetClientById(int id)
@@ -84,8 +84,9 @@ public class ClientsController : ControllerBase
     }
 
     /// <summary>
-    /// Створити клієнта.
+    /// Створити нового клієнта.
     /// </summary>
+    /// <param name="dto">Дані для реєстрації клієнта.</param>
     /// <response code="201">Клієнта створено.</response>
     /// <response code="400">Некоректні вхідні дані.</response>
     /// <response code="409">Клієнт з таким email уже існує.</response>
@@ -102,7 +103,7 @@ public class ClientsController : ControllerBase
 
         var newClient = dto.ToEntity();
 
-        _context.Clients.Add(newClient);
+        await _context.Clients.AddAsync(newClient);
         await _context.SaveChangesAsync();
 
         return CreatedAtAction(nameof(GetClientById), new { id = newClient.Id }, newClient.ToDto());
@@ -112,11 +113,12 @@ public class ClientsController : ControllerBase
     /// Оновити дані клієнта.
     /// </summary>
     /// <param name="id">Ідентифікатор клієнта.</param>
+    /// <param name="dto">Оновлені дані клієнта.</param>
     /// <response code="204">Клієнта оновлено.</response>
     /// <response code="400">Некоректні вхідні дані.</response>
     /// <response code="404">Клієнта не знайдено.</response>
     /// <response code="409">Інший клієнт уже має такий email.</response>
-    [HttpPut("{id}")]
+    [HttpPut("{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -146,7 +148,7 @@ public class ClientsController : ControllerBase
     /// <response code="204">Клієнта видалено.</response>
     /// <response code="404">Клієнта не знайдено.</response>
     /// <response code="409">У клієнта є угоди.</response>
-    [HttpDelete("{id}")]
+    [HttpDelete("{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]

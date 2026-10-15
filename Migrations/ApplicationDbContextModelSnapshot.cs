@@ -90,7 +90,7 @@ namespace RealEstateApi.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<decimal>("Price")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<int>("PropertyId")
                         .HasColumnType("INTEGER");
@@ -100,6 +100,7 @@ namespace RealEstateApi.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
+                        .HasMaxLength(20)
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
@@ -135,6 +136,7 @@ namespace RealEstateApi.Migrations
 
                     b.Property<string>("Type")
                         .IsRequired()
+                        .HasMaxLength(50)
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
