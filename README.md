@@ -47,7 +47,6 @@
 
 **Налаштування підключення:**
 Рядок підключення до бази даних зберігається у файлі `appsettings.json`:
-```json
 "ConnectionStrings": {
   "DefaultConnection": "Data Source=realestate.db"
 }
@@ -63,7 +62,7 @@ dotnet ef database update
 dotnet ef migrations add <НазваВашоїМіграції>
 Після успішного створення міграції знову виконайте dotnet ef database update.
 
-Запуск проєкту:
+**Запуск проєкту:**
 
 Запустіть проєкт у Visual Studio за допомогою F5 або виконайте команду dotnet run у терміналі.
 
