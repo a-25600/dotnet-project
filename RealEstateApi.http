@@ -275,3 +275,33 @@ DELETE {{RealEstateApi_HostAddress}}/api/properties/2
 ### 5.6 Перевірити 404 після видалення другого об'єкта (404 Not Found)
 GET {{RealEstateApi_HostAddress}}/api/properties/2
 Accept: application/json
+
+
+### ===================================================================
+### 6. КУРСИ ВАЛЮТ ТА КОНВЕРТАЦІЯ (CURRENCY - HTTPCLIENTFACTORY)
+### ===================================================================
+
+### 6.1 Отримати офіційні курси основних валют від НБУ (200 OK)
+GET {{RealEstateApi_HostAddress}}/api/currency/rates
+Accept: application/json
+
+### 6.2 Отримати курс конкретної валюти (USD) (200 OK)
+GET {{RealEstateApi_HostAddress}}/api/currency/rates/USD
+Accept: application/json
+
+### 6.3 Отримати курс конкретної валюти (EUR) (200 OK)
+GET {{RealEstateApi_HostAddress}}/api/currency/rates/EUR
+Accept: application/json
+
+### 6.4 Конвертувати суму вартості об'єкта нерухомості з USD в UAH (200 OK)
+GET {{RealEstateApi_HostAddress}}/api/currency/convert?amount=120000&fromCurrency=USD&toCurrency=UAH
+Accept: application/json
+
+### 6.5 Конвертувати суму з UAH в EUR (200 OK)
+GET {{RealEstateApi_HostAddress}}/api/currency/convert?amount=5000000&fromCurrency=UAH&toCurrency=EUR
+Accept: application/json
+
+### 6.6 Помилка конвертації: невідома валюта (404 Not Found)
+GET {{RealEstateApi_HostAddress}}/api/currency/convert?amount=1000&fromCurrency=XYZ&toCurrency=UAH
+Accept: application/json
+

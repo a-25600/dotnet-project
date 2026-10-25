@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
 using RealEstateApi.Data;
 using RealEstateApi.Middleware;
+using RealEstateApi.Services.Implementations;
+using RealEstateApi.Services.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,16 +31,26 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddScoped<IPropertyService, PropertyService>();
+builder.Services.AddScoped<IDealService, DealService>();
+builder.Services.AddScoped<IClientService, ClientService>();
+builder.Services.AddScoped<IAgentService, AgentService>();
+
+builder.Services.AddHttpClient<ICurrencyService, CurrencyService>(client =>
+{
+    client.BaseAddress = new Uri("https://bank.gov.ua/");
+    client.Timeout = TimeSpan.FromSeconds(10);
+    client.DefaultRequestHeaders.Add("User-Agent", "RealEstateApi/1.0");
+});
+
 var app = builder.Build();
 
-// Автоматичне застосування міграцій при запуску
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     dbContext.Database.Migrate();
 }
 
-// Централізована обробка помилок та логування
 app.UseMiddleware<ExceptionMiddleware>();
 app.UseMiddleware<LoggingMiddleware>();
 

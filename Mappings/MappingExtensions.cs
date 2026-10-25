@@ -11,7 +11,6 @@ public static class MappingExtensions
 {
     public static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
 
-    // ---------- Deal Expressions & Mappings ----------
     public static readonly Expression<Func<Deal, DealSummaryDto>> DealToSummary = d => new DealSummaryDto
     {
         Id = d.Id,
@@ -62,7 +61,6 @@ public static class MappingExtensions
         Status = deal.Status
     };
 
-    // ---------- Property ----------
     public static PropertyDto ToDto(this Property property) => new()
     {
         Id = property.Id,
@@ -102,7 +100,6 @@ public static class MappingExtensions
         property.IsAvailable = dto.IsAvailable;
     }
 
-    // ---------- Client ----------
     public static ClientDto ToDto(this Client client) => new()
     {
         Id = client.Id,
@@ -134,7 +131,6 @@ public static class MappingExtensions
         client.PhoneNumber = dto.PhoneNumber.Trim();
     }
 
-    // ---------- Agent ----------
     public static AgentDto ToDto(this Agent agent) => new()
     {
         Id = agent.Id,
