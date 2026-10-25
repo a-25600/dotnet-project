@@ -3,8 +3,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
 using RealEstateApi.Data;
 using RealEstateApi.Middleware;
+using RealEstateApi.Repositories;
 using RealEstateApi.Services.Implementations;
 using RealEstateApi.Services.Interfaces;
+using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,6 +33,8 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddScoped<IPropertyService, PropertyService>();
 builder.Services.AddScoped<IDealService, DealService>();
 builder.Services.AddScoped<IClientService, ClientService>();
