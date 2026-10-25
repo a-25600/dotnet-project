@@ -1,106 +1,124 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using RealEstateApi.Data;
-using RealEstateApi.DTOs;
-using RealEstateApi.Models;
+using Microsoft.AspNetCore.Mvc;
+using RealEstateApi.DTOs.Properties;
+using RealEstateApi.Services.Common;
+using RealEstateApi.Services.Interfaces;
 
 namespace RealEstateApi.Controllers;
 
+/// <summary>
+/// Керування об'єктами нерухомості агентства.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class PropertiesController : ControllerBase
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IPropertyService _propertyService;
 
-    public PropertiesController(ApplicationDbContext context)
+    public PropertiesController(IPropertyService propertyService)
     {
-        _context = context;
+        _propertyService = propertyService;
     }
 
+    /// <summary>
+    /// Отримати список об'єктів нерухомості з фільтрацією, пошуком та сортуванням.
+    /// </summary>
+    /// <param name="parameters">Параметри фільтрації (ціна, кімнати, тип, доступність), пошук та сортування.</param>
+    /// <param name="cancellationToken">Токен скасування операції.</param>
+    /// <response code="200">Успішне отримання списку об'єктів нерухомості.</response>
     [HttpGet]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetProperties([FromQuery] PropertyQueryParameters parameters)
+    [ProducesResponseType(typeof(List<PropertyDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetProperties([FromQuery] PropertyQueryParameters parameters, CancellationToken cancellationToken)
     {
-        var query = _context.Properties.AsQueryable();
-
-        if (parameters.MaxPrice.HasValue)
-            query = query.Where(p => p.Price <= parameters.MaxPrice.Value);
-
-        if (parameters.MinRooms.HasValue)
-            query = query.Where(p => p.RoomsCount >= parameters.MinRooms.Value);
-
-        if (parameters.IsAvailable.HasValue)
-            query = query.Where(p => p.IsAvailable == parameters.IsAvailable.Value);
-
-        var properties = await query.ToListAsync();
+        var properties = await _propertyService.GetAllAsync(parameters, cancellationToken);
         return Ok(properties);
     }
 
-    [HttpGet("{id}")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    /// <summary>
+    /// Отримати детальну інформацію про об'єкт нерухомості за ідентифікатором.
+    /// </summary>
+    /// <param name="id">Унікальний ідентифікатор об'єкта.</param>
+    /// <param name="cancellationToken">Токен скасування операції.</param>
+    /// <response code="200">Об'єкт знайдено, повертаються деталі та історія угод.</response>
+    /// <response code="404">Об'єкт із вказаним ідентифікатором не знайдено.</response>
+    [HttpGet("{id:int}")]
+    [ProducesResponseType(typeof(PropertyDetailsDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetProperty(int id)
+    public async Task<IActionResult> GetPropertyById(int id, CancellationToken cancellationToken)
     {
-        var property = await _context.Properties.FindAsync(id);
+        var result = await _propertyService.GetByIdAsync(id, cancellationToken);
 
-        if (property == null)
-            return NotFound();
+        if (!result.IsSuccess)
+            return NotFound(new { message = result.ErrorMessage });
 
-        return Ok(property);
+        return Ok(result.Data);
     }
 
+    /// <summary>
+    /// Створити новий об'єкт нерухомості.
+    /// </summary>
+    /// <param name="dto">Дані для створення об'єкта нерухомості.</param>
+    /// <param name="cancellationToken">Токен скасування операції.</param>
+    /// <response code="201">Об'єкт успішно створено.</response>
+    /// <response code="400">Некоректні вхідні дані.</response>
     [HttpPost]
-    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(PropertyDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> CreateProperty([FromBody] PropertyDto dto)
+    public async Task<IActionResult> CreateProperty([FromBody] CreatePropertyDto dto, CancellationToken cancellationToken)
     {
-        var newProperty = new Property
+        var result = await _propertyService.CreateAsync(dto, cancellationToken);
+
+        if (!result.IsSuccess)
+            return BadRequest(new { message = result.ErrorMessage });
+
+        return CreatedAtAction(nameof(GetPropertyById), new { id = result.Data!.Id }, result.Data);
+    }
+
+    /// <summary>
+    /// Оновити дані об'єкта нерухомості.
+    /// </summary>
+    /// <param name="id">Ідентифікатор об'єкта нерухомості.</param>
+    /// <param name="dto">Оновлені дані об'єкта.</param>
+    /// <param name="cancellationToken">Токен скасування операції.</param>
+    /// <response code="204">Об'єкт успішно оновлено.</response>
+    /// <response code="400">Некоректні вхідні дані.</response>
+    /// <response code="404">Об'єкт із вказаним ідентифікатором не знайдено.</response>
+    [HttpPut("{id:int}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateProperty(int id, [FromBody] UpdatePropertyDto dto, CancellationToken cancellationToken)
+    {
+        var result = await _propertyService.UpdateAsync(id, dto, cancellationToken);
+
+        return result.Status switch
         {
-            Address = dto.Address,
-            Price = dto.Price,
-            RoomsCount = dto.RoomsCount,
-            IsAvailable = dto.IsAvailable
+            ServiceStatus.NotFound => NotFound(new { message = result.ErrorMessage }),
+            ServiceStatus.BadRequest => BadRequest(new { message = result.ErrorMessage }),
+            _ => NoContent()
         };
-
-        await _context.Properties.AddAsync(newProperty);
-        await _context.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(GetProperty), new { id = newProperty.Id }, newProperty);
     }
 
-    [HttpPut("{id}")]
+    /// <summary>
+    /// Видалити об'єкт нерухомості. Об'єкт не можна видалити, якщо до нього прив'язані угоди.
+    /// </summary>
+    /// <param name="id">Ідентифікатор об'єкта для видалення.</param>
+    /// <param name="cancellationToken">Токен скасування операції.</param>
+    /// <response code="204">Об'єкт успішно видалено.</response>
+    /// <response code="404">Об'єкт із вказаним ідентифікатором не знайдено.</response>
+    /// <response code="409">Об'єкт має пов'язані угоди і не може бути видалений.</response>
+    [HttpDelete("{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UpdateProperty(int id, [FromBody] PropertyDto dto)
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> DeleteProperty(int id, CancellationToken cancellationToken)
     {
-        var existingProperty = await _context.Properties.FindAsync(id);
+        var result = await _propertyService.DeleteAsync(id, cancellationToken);
 
-        if (existingProperty == null)
-            return NotFound();
-
-        existingProperty.Address = dto.Address;
-        existingProperty.Price = dto.Price;
-        existingProperty.RoomsCount = dto.RoomsCount;
-        existingProperty.IsAvailable = dto.IsAvailable;
-
-        await _context.SaveChangesAsync();
-
-        return NoContent();
-    }
-
-    [HttpDelete("{id}")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> DeleteProperty(int id)
-    {
-        var property = await _context.Properties.FindAsync(id);
-
-        if (property == null)
-            return NotFound();
-
-        _context.Properties.Remove(property);
-        await _context.SaveChangesAsync();
-
-        return NoContent();
+        return result.Status switch
+        {
+            ServiceStatus.NotFound => NotFound(new { message = result.ErrorMessage }),
+            ServiceStatus.Conflict => Conflict(new { message = result.ErrorMessage }),
+            _ => NoContent()
+        };
     }
 }

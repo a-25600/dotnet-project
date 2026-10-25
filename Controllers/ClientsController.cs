@@ -1,115 +1,135 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using RealEstateApi.Data;
 using RealEstateApi.DTOs.Clients;
-using RealEstateApi.Models;
+using RealEstateApi.Services.Common;
+using RealEstateApi.Services.Interfaces;
 
 namespace RealEstateApi.Controllers;
 
+/// <summary>
+/// Керування клієнтами агентства нерухомості.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class ClientsController : ControllerBase
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IClientService _clientService;
 
-    public ClientsController(ApplicationDbContext context)
+    public ClientsController(IClientService clientService)
     {
-        _context = context;
+        _clientService = clientService;
     }
 
-    private static ClientDto ToDto(Client client) => new()
-    {
-        Id = client.Id,
-        FullName = client.FullName,
-        Email = client.Email,
-        PhoneNumber = client.PhoneNumber
-    };
-
+    /// <summary>
+    /// Отримати список клієнтів із пошуком і сортуванням.
+    /// </summary>
+    /// <param name="parameters">Параметри запиту: search (ПІБ, email, телефон), sortBy (name, email, phone, id), sortOrder (asc, desc).</param>
+    /// <param name="cancellationToken">Токен скасування операції.</param>
+    /// <response code="200">Список клієнтів.</response>
     [HttpGet]
-    public async Task<IActionResult> GetAllClients([FromQuery] ClientQueryParameters parameters)
+    [ProducesResponseType(typeof(List<ClientDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAllClients([FromQuery] ClientQueryParameters parameters, CancellationToken cancellationToken)
     {
-        var query = _context.Clients.AsQueryable();
+        var clients = await _clientService.GetAllAsync(parameters, cancellationToken);
+        return Ok(clients);
+    }
 
-        if (!string.IsNullOrWhiteSpace(parameters.Search))
+    /// <summary>
+    /// Отримати клієнта за ідентифікатором разом зі списком його угод.
+    /// </summary>
+    /// <param name="id">Ідентифікатор клієнта.</param>
+    /// <param name="cancellationToken">Токен скасування операції.</param>
+    /// <response code="200">Клієнт із вкладеними угодами.</response>
+    /// <response code="404">Клієнта не знайдено.</response>
+    [HttpGet("{id:int}")]
+    [ProducesResponseType(typeof(ClientDetailsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetClientById(int id, CancellationToken cancellationToken)
+    {
+        var result = await _clientService.GetByIdAsync(id, cancellationToken);
+
+        if (!result.IsSuccess)
+            return NotFound(new { message = result.ErrorMessage });
+
+        return Ok(result.Data);
+    }
+
+    /// <summary>
+    /// Створити нового клієнта.
+    /// </summary>
+    /// <param name="dto">Дані для реєстрації клієнта.</param>
+    /// <param name="cancellationToken">Токен скасування операції.</param>
+    /// <response code="201">Клієнта створено.</response>
+    /// <response code="400">Некоректні вхідні дані.</response>
+    /// <response code="409">Клієнт з таким email уже існує.</response>
+    [HttpPost]
+    [ProducesResponseType(typeof(ClientDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CreateClient([FromBody] CreateClientDto dto, CancellationToken cancellationToken)
+    {
+        var result = await _clientService.CreateAsync(dto, cancellationToken);
+
+        if (!result.IsSuccess)
         {
-            var term = parameters.Search.Trim().ToLower();
-            query = query.Where(c =>
-                c.FullName.ToLower().Contains(term) ||
-                c.Email.ToLower().Contains(term) ||
-                c.PhoneNumber.ToLower().Contains(term));
+            return result.Status switch
+            {
+                ServiceStatus.Conflict => Conflict(new { message = result.ErrorMessage }),
+                _ => BadRequest(new { message = result.ErrorMessage })
+            };
         }
 
-        var descending = string.Equals(parameters.SortOrder, "desc", StringComparison.OrdinalIgnoreCase);
-        query = (parameters.SortBy?.ToLower()) switch
+        return CreatedAtAction(nameof(GetClientById), new { id = result.Data!.Id }, result.Data);
+    }
+
+    /// <summary>
+    /// Оновити дані клієнта.
+    /// </summary>
+    /// <param name="id">Ідентифікатор клієнта.</param>
+    /// <param name="dto">Оновлені дані клієнта.</param>
+    /// <param name="cancellationToken">Токен скасування операції.</param>
+    /// <response code="204">Клієнта оновлено.</response>
+    /// <response code="400">Некоректні вхідні дані.</response>
+    /// <response code="404">Клієнта не знайдено.</response>
+    /// <response code="409">Інший клієнт уже має такий email.</response>
+    [HttpPut("{id:int}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdateClient(int id, [FromBody] UpdateClientDto dto, CancellationToken cancellationToken)
+    {
+        var result = await _clientService.UpdateAsync(id, dto, cancellationToken);
+
+        return result.Status switch
         {
-            "id" => descending ? query.OrderByDescending(c => c.Id) : query.OrderBy(c => c.Id),
-            "email" => descending ? query.OrderByDescending(c => c.Email) : query.OrderBy(c => c.Email),
-            "phonenumber" or "phone" => descending
-                ? query.OrderByDescending(c => c.PhoneNumber)
-                : query.OrderBy(c => c.PhoneNumber),
-            _ => descending
-                ? query.OrderByDescending(c => c.FullName)
-                : query.OrderBy(c => c.FullName)
+            ServiceStatus.NotFound => NotFound(new { message = result.ErrorMessage }),
+            ServiceStatus.Conflict => Conflict(new { message = result.ErrorMessage }),
+            ServiceStatus.BadRequest => BadRequest(new { message = result.ErrorMessage }),
+            _ => NoContent()
         };
-
-        var clients = await query.ToListAsync();
-        return Ok(clients.Select(ToDto).ToList());
     }
 
-    [HttpGet("{id}")]
-    public async Task<IActionResult> GetClientById(int id)
+    /// <summary>
+    /// Видалити клієнта. Клієнта, який має угоди, видалити не можна.
+    /// </summary>
+    /// <param name="id">Ідентифікатор клієнта.</param>
+    /// <param name="cancellationToken">Токен скасування операції.</param>
+    /// <response code="204">Клієнта видалено.</response>
+    /// <response code="404">Клієнта не знайдено.</response>
+    /// <response code="409">У клієнта є угоди.</response>
+    [HttpDelete("{id:int}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> DeleteClient(int id, CancellationToken cancellationToken)
     {
-        var client = await _context.Clients.FindAsync(id);
+        var result = await _clientService.DeleteAsync(id, cancellationToken);
 
-        if (client == null)
-            return NotFound(new { message = $"Client with id {id} not found" });
-
-        return Ok(ToDto(client));
-    }
-
-    [HttpPost]
-    public async Task<IActionResult> CreateClient([FromBody] CreateClientDto dto)
-    {
-        var newClient = new Client
+        return result.Status switch
         {
-            FullName = dto.FullName,
-            Email = dto.Email,
-            PhoneNumber = dto.PhoneNumber
+            ServiceStatus.NotFound => NotFound(new { message = result.ErrorMessage }),
+            ServiceStatus.Conflict => Conflict(new { message = result.ErrorMessage }),
+            _ => NoContent()
         };
-
-        _context.Clients.Add(newClient);
-        await _context.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(GetClientById), new { id = newClient.Id }, ToDto(newClient));
-    }
-
-    [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateClient(int id, [FromBody] UpdateClientDto dto)
-    {
-        var client = await _context.Clients.FindAsync(id);
-
-        if (client == null)
-            return NotFound();
-
-        client.FullName = dto.FullName;
-        client.Email = dto.Email;
-        client.PhoneNumber = dto.PhoneNumber;
-
-        await _context.SaveChangesAsync();
-        return NoContent();
-    }
-
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteClient(int id)
-    {
-        var client = await _context.Clients.FindAsync(id);
-
-        if (client == null)
-            return NotFound();
-
-        _context.Clients.Remove(client);
-        await _context.SaveChangesAsync();
-
-        return NoContent();
     }
 }

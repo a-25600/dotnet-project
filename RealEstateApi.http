@@ -1,6 +1,307 @@
 @RealEstateApi_HostAddress = http://localhost:5064
 
-GET {{RealEstateApi_HostAddress}}/weatherforecast/
+### ===================================================================
+### 1. НЕРУХОМІСТЬ (PROPERTIES)
+### ===================================================================
+
+### 1.1 Створити новий об'єкт нерухомості (201 Created)
+POST {{RealEstateApi_HostAddress}}/api/properties
+Content-Type: application/json
+
+{
+  "address": "м. Київ, вул. Хрещатик, 24, кв. 10",
+  "price": 125000,
+  "type": "Apartment",
+  "roomsCount": 3,
+  "isAvailable": true
+}
+
+### 1.2 Створити ще один об'єкт (котедж) (201 Created)
+POST {{RealEstateApi_HostAddress}}/api/properties
+Content-Type: application/json
+
+{
+  "address": "м. Київ, вул. Лісова, 15",
+  "price": 250000,
+  "type": "House",
+  "roomsCount": 5,
+  "isAvailable": true
+}
+
+### 1.3 Помилка валідації: ціна нижче мінімальної (400 Bad Request)
+POST {{RealEstateApi_HostAddress}}/api/properties
+Content-Type: application/json
+
+{
+  "address": "м. Львів",
+  "price": 50,
+  "type": "A",
+  "roomsCount": 0,
+  "isAvailable": true
+}
+
+### 1.4 Отримати всі об'єкти нерухомості (200 OK)
+GET {{RealEstateApi_HostAddress}}/api/properties
 Accept: application/json
 
-###
+### 1.5 Фільтрація об'єктів: за максимальною ціною та кількістю кімнат (200 OK)
+GET {{RealEstateApi_HostAddress}}/api/properties?maxPrice=200000&minRooms=2&isAvailable=true
+Accept: application/json
+
+### 1.6 Пошук та сортування нерухомості за ціною (desc) (200 OK)
+GET {{RealEstateApi_HostAddress}}/api/properties?search=Хрещатик&sortBy=price&sortOrder=desc
+Accept: application/json
+
+### 1.7 Отримати об'єкт нерухомості за ID з історією угод (200 OK)
+GET {{RealEstateApi_HostAddress}}/api/properties/1
+Accept: application/json
+
+### 1.8 Отримати неіснуючий об'єкт (404 Not Found)
+GET {{RealEstateApi_HostAddress}}/api/properties/9999
+Accept: application/json
+
+### 1.9 Оновити дані об'єкта нерухомості (204 No Content)
+PUT {{RealEstateApi_HostAddress}}/api/properties/1
+Content-Type: application/json
+
+{
+  "address": "м. Київ, вул. Хрещатик, 24, кв. 10 (після ремонту)",
+  "price": 135000,
+  "type": "Apartment",
+  "roomsCount": 3,
+  "isAvailable": true
+}
+
+
+### ===================================================================
+### 2. РІЕЛТОРИ (AGENTS)
+### ===================================================================
+
+### 2.1 Створити ріелтора (201 Created)
+POST {{RealEstateApi_HostAddress}}/api/agents
+Content-Type: application/json
+
+{
+  "fullName": "Олександр Шевченко",
+  "email": "shevchenko.agent@realestate.ua",
+  "phoneNumber": "+380501112233",
+  "licenseNumber": "LIC-2026-001"
+}
+
+### 2.2 Створити другого ріелтора (201 Created)
+POST {{RealEstateApi_HostAddress}}/api/agents
+Content-Type: application/json
+
+{
+  "fullName": "Марина Ковальчук",
+  "email": "kovalchuk.agent@realestate.ua",
+  "phoneNumber": "+380679998877",
+  "licenseNumber": "LIC-2026-002"
+}
+
+### 2.3 Конфлікт унікальності: дублювання email або ліцензії (409 Conflict)
+POST {{RealEstateApi_HostAddress}}/api/agents
+Content-Type: application/json
+
+{
+  "fullName": "Дублікат Ріелтора",
+  "email": "shevchenko.agent@realestate.ua",
+  "phoneNumber": "+380990001122",
+  "licenseNumber": "LIC-2026-001"
+}
+
+### 2.4 Отримати список ріелторів із пошуком та сортуванням (200 OK)
+GET {{RealEstateApi_HostAddress}}/api/agents?search=Шевченко&sortBy=name&sortOrder=asc
+Accept: application/json
+
+### 2.5 Отримати ріелтора за ID разом з його угодами (200 OK)
+GET {{RealEstateApi_HostAddress}}/api/agents/1
+Accept: application/json
+
+### 2.6 Оновити дані ріелтора (204 No Content)
+PUT {{RealEstateApi_HostAddress}}/api/agents/1
+Content-Type: application/json
+
+{
+  "fullName": "Олександр Шевченко (Senior Realtor)",
+  "email": "shevchenko.agent@realestate.ua",
+  "phoneNumber": "+380501112233",
+  "licenseNumber": "LIC-2026-001",
+  "isActive": true
+}
+
+
+### ===================================================================
+### 3. КЛІЄНТИ (CLIENTS)
+### ===================================================================
+
+### 3.1 Створити нового клієнта (201 Created)
+POST {{RealEstateApi_HostAddress}}/api/clients
+Content-Type: application/json
+
+{
+  "fullName": "Іван Петренко",
+  "email": "petrenko.ivan@gmail.com",
+  "phoneNumber": "+380951234567"
+}
+
+### 3.2 Створити другого клієнта (201 Created)
+POST {{RealEstateApi_HostAddress}}/api/clients
+Content-Type: application/json
+
+{
+  "fullName": "Олена Мельник",
+  "email": "melnyk.olena@gmail.com",
+  "phoneNumber": "+380637654321"
+}
+
+### 3.3 Помилка валідації формату email (400 Bad Request)
+POST {{RealEstateApi_HostAddress}}/api/clients
+Content-Type: application/json
+
+{
+  "fullName": "Тестовий Клієнт",
+  "email": "invalid-email-format",
+  "phoneNumber": "+380501234567"
+}
+
+### 3.4 Конфлікт унікальності email клієнта (409 Conflict)
+POST {{RealEstateApi_HostAddress}}/api/clients
+Content-Type: application/json
+
+{
+  "fullName": "Іван Петренко (клон)",
+  "email": "petrenko.ivan@gmail.com",
+  "phoneNumber": "+380959998877"
+}
+
+### 3.5 Отримати список клієнтів із сортуванням (200 OK)
+GET {{RealEstateApi_HostAddress}}/api/clients?sortBy=name&sortOrder=asc
+Accept: application/json
+
+### 3.6 Отримати клієнта за ID з вкладеними угодами (200 OK)
+GET {{RealEstateApi_HostAddress}}/api/clients/1
+Accept: application/json
+
+### 3.7 Оновити дані клієнта (204 No Content)
+PUT {{RealEstateApi_HostAddress}}/api/clients/1
+Content-Type: application/json
+
+{
+  "fullName": "Іван Петренко",
+  "email": "petrenko.ivan@gmail.com",
+  "phoneNumber": "+380957778899"
+}
+
+
+### ===================================================================
+### 4. УГОДИ (DEALS)
+### ===================================================================
+
+### 4.1 Створити нову угоду (201 Created)
+POST {{RealEstateApi_HostAddress}}/api/deals
+Content-Type: application/json
+
+{
+  "propertyId": 1,
+  "clientId": 1,
+  "realtorId": 1,
+  "price": 135000
+}
+
+### 4.2 Помилка створення угоди: неіснуючий об'єкт (400 Bad Request)
+POST {{RealEstateApi_HostAddress}}/api/deals
+Content-Type: application/json
+
+{
+  "propertyId": 9999,
+  "clientId": 1,
+  "realtorId": 1,
+  "price": 100000
+}
+
+### 4.3 Отримати список усіх угод з фільтром за статусом та сортуванням (200 OK)
+GET {{RealEstateApi_HostAddress}}/api/deals?status=Pending&sortBy=date&sortOrder=desc
+Accept: application/json
+
+### 4.4 Отримати угоду за ID (200 OK)
+GET {{RealEstateApi_HostAddress}}/api/deals/1
+Accept: application/json
+
+### 4.5 Оновити угоду: успішне закриття (Completed) (204 No Content)
+PUT {{RealEstateApi_HostAddress}}/api/deals/1
+Content-Type: application/json
+
+{
+  "price": 135000,
+  "status": "Completed"
+}
+
+### 4.6 Перевірити, що нерухомість стала недоступною після завершення угоди (200 OK, isAvailable = false)
+GET {{RealEstateApi_HostAddress}}/api/properties/1
+Accept: application/json
+
+### 4.7 Спроба створити угоду на об'єкт, який вже недоступний (400 Bad Request)
+POST {{RealEstateApi_HostAddress}}/api/deals
+Content-Type: application/json
+
+{
+  "propertyId": 1,
+  "clientId": 2,
+  "realtorId": 1,
+  "price": 135000
+}
+
+
+### ===================================================================
+### 5. ЗАХИСТ ЦІЛІСНОСТІ ТА ВИДАЛЕННЯ (INTEGRITY & DELETE)
+### ===================================================================
+
+### 5.1 Спроба видалити клієнта, який має укладені угоди (409 Conflict)
+DELETE {{RealEstateApi_HostAddress}}/api/clients/1
+
+### 5.2 Спроба видалити ріелтора, який веде угоди (409 Conflict)
+DELETE {{RealEstateApi_HostAddress}}/api/agents/1
+
+### 5.3 Спроба видалити об'єкт нерухомості з історією угод (409 Conflict)
+DELETE {{RealEstateApi_HostAddress}}/api/properties/1
+
+### 5.4 Видалити угоду (204 No Content)
+DELETE {{RealEstateApi_HostAddress}}/api/deals/1
+
+### 5.5 Видалити другий об'єкт нерухомості, який не має угод (204 No Content)
+DELETE {{RealEstateApi_HostAddress}}/api/properties/2
+
+### 5.6 Перевірити 404 після видалення другого об'єкта (404 Not Found)
+GET {{RealEstateApi_HostAddress}}/api/properties/2
+Accept: application/json
+
+
+### ===================================================================
+### 6. КУРСИ ВАЛЮТ ТА КОНВЕРТАЦІЯ (CURRENCY - HTTPCLIENTFACTORY)
+### ===================================================================
+
+### 6.1 Отримати офіційні курси основних валют від НБУ (200 OK)
+GET {{RealEstateApi_HostAddress}}/api/currency/rates
+Accept: application/json
+
+### 6.2 Отримати курс конкретної валюти (USD) (200 OK)
+GET {{RealEstateApi_HostAddress}}/api/currency/rates/USD
+Accept: application/json
+
+### 6.3 Отримати курс конкретної валюти (EUR) (200 OK)
+GET {{RealEstateApi_HostAddress}}/api/currency/rates/EUR
+Accept: application/json
+
+### 6.4 Конвертувати суму вартості об'єкта нерухомості з USD в UAH (200 OK)
+GET {{RealEstateApi_HostAddress}}/api/currency/convert?amount=120000&fromCurrency=USD&toCurrency=UAH
+Accept: application/json
+
+### 6.5 Конвертувати суму з UAH в EUR (200 OK)
+GET {{RealEstateApi_HostAddress}}/api/currency/convert?amount=5000000&fromCurrency=UAH&toCurrency=EUR
+Accept: application/json
+
+### 6.6 Помилка конвертації: невідома валюта (404 Not Found)
+GET {{RealEstateApi_HostAddress}}/api/currency/convert?amount=1000&fromCurrency=XYZ&toCurrency=UAH
+Accept: application/json
+

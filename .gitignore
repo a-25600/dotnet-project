@@ -6,6 +6,14 @@
 # dotenv files
 .env
 
+# Seed
+[Dd]ata/[Dd]bInitializer.cs
+*DbInitializer*
+
+# SQLite temporary files
+*.db-shm
+*.db-wal
+
 # User-specific files
 *.rsuser
 *.suo
