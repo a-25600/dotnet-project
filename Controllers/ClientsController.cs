@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using RealEstateApi.DTOs.Clients;
 using RealEstateApi.Services.Common;
 using RealEstateApi.Services.Interfaces;
-
+using Microsoft.AspNetCore.Authorization;
 namespace RealEstateApi.Controllers;
 
 /// <summary>
@@ -10,6 +10,7 @@ namespace RealEstateApi.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = AppRoles.UserOrAdministrator)]
 public class ClientsController : ControllerBase
 {
     private readonly IClientService _clientService;
@@ -121,6 +122,7 @@ public class ClientsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [Authorize(Roles = AppRoles.Administrator)]
     public async Task<IActionResult> DeleteClient(int id, CancellationToken cancellationToken)
     {
         var result = await _clientService.DeleteAsync(id, cancellationToken);

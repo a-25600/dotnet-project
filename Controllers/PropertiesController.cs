@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using RealEstateApi.DTOs.Properties;
 using RealEstateApi.Services.Common;
 using RealEstateApi.Services.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 
 namespace RealEstateApi.Controllers;
 
@@ -10,9 +11,11 @@ namespace RealEstateApi.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = AppRoles.UserOrAdministrator)]
 public class PropertiesController : ControllerBase
 {
     private readonly IPropertyService _propertyService;
+
 
     public PropertiesController(IPropertyService propertyService)
     {
@@ -26,6 +29,7 @@ public class PropertiesController : ControllerBase
     /// <param name="cancellationToken">Токен скасування операції.</param>
     /// <response code="200">Успішне отримання списку об'єктів нерухомості.</response>
     [HttpGet]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(List<PropertyDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetProperties([FromQuery] PropertyQueryParameters parameters, CancellationToken cancellationToken)
     {
@@ -41,6 +45,7 @@ public class PropertiesController : ControllerBase
     /// <response code="200">Об'єкт знайдено, повертаються деталі та історія угод.</response>
     /// <response code="404">Об'єкт із вказаним ідентифікатором не знайдено.</response>
     [HttpGet("{id:int}")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(PropertyDetailsDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetPropertyById(int id, CancellationToken cancellationToken)
@@ -107,6 +112,7 @@ public class PropertiesController : ControllerBase
     /// <response code="404">Об'єкт із вказаним ідентифікатором не знайдено.</response>
     /// <response code="409">Об'єкт має пов'язані угоди і не може бути видалений.</response>
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = AppRoles.Administrator)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
