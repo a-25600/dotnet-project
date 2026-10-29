@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using RealEstateApi.DTOs.Deals;
 using RealEstateApi.Services.Common;
 using RealEstateApi.Services.Interfaces;
-
+using Microsoft.AspNetCore.Authorization;
 namespace RealEstateApi.Controllers;
 
 /// <summary>
@@ -27,6 +27,7 @@ public class DealsController : ControllerBase
     /// <response code="200">Список угод.</response>
     [HttpGet]
     [ProducesResponseType(typeof(List<DealDto>), StatusCodes.Status200OK)]
+    [Authorize(Roles = AppRoles.UserOrAdministrator)]
     public async Task<IActionResult> GetAllDeals([FromQuery] DealQueryParameters parameters, CancellationToken cancellationToken)
     {
         var deals = await _dealService.GetAllAsync(parameters, cancellationToken);
@@ -108,6 +109,7 @@ public class DealsController : ControllerBase
     [HttpDelete("{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [Authorize(Roles = AppRoles.Administrator)]
     public async Task<IActionResult> DeleteDeal(int id, CancellationToken cancellationToken)
     {
         var result = await _dealService.DeleteAsync(id, cancellationToken);

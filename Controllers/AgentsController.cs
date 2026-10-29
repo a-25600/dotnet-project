@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using RealEstateApi.DTOs.Agents;
 using RealEstateApi.Services.Common;
 using RealEstateApi.Services.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 
 namespace RealEstateApi.Controllers;
 
@@ -10,6 +11,7 @@ namespace RealEstateApi.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = AppRoles.UserOrAdministrator)]
 public class AgentsController : ControllerBase
 {
     private readonly IAgentService _agentService;
@@ -65,6 +67,7 @@ public class AgentsController : ControllerBase
     [ProducesResponseType(typeof(AgentDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [Authorize(Roles = AppRoles.Administrator)]
     public async Task<IActionResult> CreateAgent([FromBody] CreateAgentDto dto, CancellationToken cancellationToken)
     {
         var result = await _agentService.CreateAsync(dto, cancellationToken);
@@ -96,6 +99,7 @@ public class AgentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [Authorize(Roles = AppRoles.Administrator)]
     public async Task<IActionResult> UpdateAgent(int id, [FromBody] UpdateAgentDto dto, CancellationToken cancellationToken)
     {
         var result = await _agentService.UpdateAsync(id, dto, cancellationToken);
@@ -121,6 +125,7 @@ public class AgentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [Authorize(Roles = AppRoles.Administrator)]
     public async Task<IActionResult> DeleteAgent(int id, CancellationToken cancellationToken)
     {
         var result = await _agentService.DeleteAsync(id, cancellationToken);
