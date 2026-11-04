@@ -10,10 +10,12 @@ namespace RealEstateApi.Services.Implementations;
 public class ClientService : IClientService
 {
     private readonly ApplicationDbContext _context;
+    private readonly ICacheService _cache;
 
-    public ClientService(ApplicationDbContext context)
+    public ClientService(ApplicationDbContext context, ICacheService cache)
     {
         _context = context;
+        _cache = cache;
     }
 
     public async Task<IReadOnlyList<ClientDto>> GetAllAsync(ClientQueryParameters parameters, CancellationToken cancellationToken = default)
@@ -94,6 +96,7 @@ public class ClientService : IClientService
 
         client.UpdateFrom(dto);
         await _context.SaveChangesAsync(cancellationToken);
+        _cache.InvalidateRegions(CacheRegions.Properties, CacheRegions.Agents);
 
         return ServiceResult.Ok();
     }

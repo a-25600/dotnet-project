@@ -11,7 +11,10 @@ namespace RealEstateApi.Services.Implementations;
 /// </summary>
 public class CurrencyService : ICurrencyService
 {
+    private const string NbuRatesCacheKey = "nbu:all";
+
     private readonly HttpClient _httpClient;
+    private readonly ICacheService _cache;
     private readonly ILogger<CurrencyService> _logger;
 
     private static readonly Dictionary<string, (string Name, decimal Rate)> FallbackRates = new(StringComparer.OrdinalIgnoreCase)
@@ -23,50 +26,27 @@ public class CurrencyService : ICurrencyService
         ["CHF"] = ("Швейцарський франк", 47.90m)
     };
 
-    public CurrencyService(HttpClient httpClient, ILogger<CurrencyService> logger)
+    public CurrencyService(HttpClient httpClient, ICacheService cache, ILogger<CurrencyService> logger)
     {
         _httpClient = httpClient;
+        _cache = cache;
         _logger = logger;
     }
 
     public async Task<ServiceResult<IReadOnlyList<CurrencyRateDto>>> GetExchangeRatesAsync(CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var response = await _httpClient.GetFromJsonAsync<List<NbuRateItem>>(
-                "NBUStatService/v1/statdirectory/exchange?json",
-                cancellationToken);
+        var nbuRates = await GetNbuRatesAsync(cancellationToken);
 
-            if (response == null || response.Count == 0)
-            {
-                _logger.LogWarning("NBU API returned empty list of rates, using fallback values.");
-                return ServiceResult<IReadOnlyList<CurrencyRateDto>>.Ok(GetFallbackRates());
-            }
-
-            var supportedCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                "USD", "EUR", "PLN", "GBP", "CHF"
-            };
-
-            var rates = response
-                .Where(r => supportedCodes.Contains(r.Cc))
-                .Select(r => new CurrencyRateDto
-                {
-                    CurrencyCode = r.Cc.ToUpperInvariant(),
-                    CurrencyName = r.Txt,
-                    Rate = r.Rate,
-                    ExchangeDate = r.ExchangeDate
-                })
-                .OrderBy(r => r.CurrencyCode)
-                .ToList();
-
-            return ServiceResult<IReadOnlyList<CurrencyRateDto>>.Ok(rates);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to fetch exchange rates from NBU API. Using fallback rates.");
+        if (nbuRates == null)
             return ServiceResult<IReadOnlyList<CurrencyRateDto>>.Ok(GetFallbackRates());
-        }
+
+        var rates = nbuRates
+            .Where(r => FallbackRates.ContainsKey(r.Cc))
+            .Select(ToDto)
+            .OrderBy(r => r.CurrencyCode)
+            .ToList();
+
+        return ServiceResult<IReadOnlyList<CurrencyRateDto>>.Ok(rates);
     }
 
     public async Task<ServiceResult<CurrencyRateDto>> GetRateByCodeAsync(string currencyCode, CancellationToken cancellationToken = default)
@@ -84,28 +64,11 @@ public class CurrencyService : ICurrencyService
             });
         }
 
-        try
-        {
-            var response = await _httpClient.GetFromJsonAsync<List<NbuRateItem>>(
-                $"NBUStatService/v1/statdirectory/exchange?valcode={code}&json",
-                cancellationToken);
+        var nbuRates = await GetNbuRatesAsync(cancellationToken);
+        var item = nbuRates?.FirstOrDefault(r => string.Equals(r.Cc, code, StringComparison.OrdinalIgnoreCase));
 
-            var item = response?.FirstOrDefault();
-            if (item != null)
-            {
-                return ServiceResult<CurrencyRateDto>.Ok(new CurrencyRateDto
-                {
-                    CurrencyCode = item.Cc.ToUpperInvariant(),
-                    CurrencyName = item.Txt,
-                    Rate = item.Rate,
-                    ExchangeDate = item.ExchangeDate
-                });
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to fetch rate for {Code} from NBU API. Checking fallback rates.", code);
-        }
+        if (item != null)
+            return ServiceResult<CurrencyRateDto>.Ok(ToDto(item));
 
         if (FallbackRates.TryGetValue(code, out var fallback))
         {
@@ -120,6 +83,45 @@ public class CurrencyService : ICurrencyService
 
         return ServiceResult<CurrencyRateDto>.NotFound($"Exchange rate for currency '{currencyCode}' not found.");
     }
+
+    private Task<IReadOnlyList<NbuRateItem>?> GetNbuRatesAsync(CancellationToken cancellationToken) =>
+        _cache.GetOrCreateAsync(
+            CacheRegions.Currency,
+            NbuRatesCacheKey,
+            FetchNbuRatesAsync,
+            rates => rates is { Count: > 0 },
+            cancellationToken);
+
+    private async Task<IReadOnlyList<NbuRateItem>?> FetchNbuRatesAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await _httpClient.GetFromJsonAsync<List<NbuRateItem>>(
+                "NBUStatService/v1/statdirectory/exchange?json",
+                cancellationToken);
+
+            if (response == null || response.Count == 0)
+            {
+                _logger.LogWarning("NBU API returned empty list of rates, using fallback values.");
+                return null;
+            }
+
+            return response;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to fetch exchange rates from NBU API. Using fallback rates.");
+            return null;
+        }
+    }
+
+    private static CurrencyRateDto ToDto(NbuRateItem item) => new()
+    {
+        CurrencyCode = item.Cc.ToUpperInvariant(),
+        CurrencyName = item.Txt,
+        Rate = item.Rate,
+        ExchangeDate = item.ExchangeDate
+    };
 
     public async Task<ServiceResult<CurrencyConversionResultDto>> ConvertAsync(
         decimal amount,

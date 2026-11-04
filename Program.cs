@@ -103,6 +103,8 @@ builder.Services.AddAuthorization();
 // Репозиторії та Unit of Work
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.Configure<CacheSettings>(builder.Configuration.GetSection("Caching"));
+builder.Services.AddSingleton<ICacheService, MemoryCacheService>();
 
 // Бізнес-сервіси
 builder.Services.AddScoped<IPropertyService, PropertyService>();

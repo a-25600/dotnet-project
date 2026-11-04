@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using RealEstateApi.Data;
 using RealEstateApi.DTOs.Properties;
@@ -10,13 +11,30 @@ namespace RealEstateApi.Services.Implementations;
 public class PropertyService : IPropertyService
 {
     private readonly ApplicationDbContext _context;
+    private readonly ICacheService _cache;
 
-    public PropertyService(ApplicationDbContext context)
+    public PropertyService(ApplicationDbContext context, ICacheService cache)
     {
         _context = context;
+        _cache = cache;
     }
 
-    public async Task<IReadOnlyList<PropertyDto>> GetAllAsync(PropertyQueryParameters parameters, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<PropertyDto>> GetAllAsync(PropertyQueryParameters parameters, CancellationToken cancellationToken = default) =>
+        _cache.GetOrCreateAsync(
+            CacheRegions.Properties,
+            $"list:{JsonSerializer.Serialize(parameters)}",
+            ct => LoadAllAsync(parameters, ct),
+            cancellationToken: cancellationToken);
+
+    public Task<ServiceResult<PropertyDetailsDto>> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
+        _cache.GetOrCreateAsync(
+            CacheRegions.Properties,
+            $"details:{id}",
+            ct => LoadByIdAsync(id, ct),
+            result => result.IsSuccess,
+            cancellationToken);
+
+    private async Task<IReadOnlyList<PropertyDto>> LoadAllAsync(PropertyQueryParameters parameters, CancellationToken cancellationToken)
     {
         var query = _context.Properties.AsNoTracking().AsQueryable();
 
@@ -61,7 +79,7 @@ public class PropertyService : IPropertyService
         return properties.Select(p => p.ToDto()).ToList();
     }
 
-    public async Task<ServiceResult<PropertyDetailsDto>> GetByIdAsync(int id, CancellationToken cancellationToken = default)
+    private async Task<ServiceResult<PropertyDetailsDto>> LoadByIdAsync(int id, CancellationToken cancellationToken)
     {
         var property = await _context.Properties
             .AsNoTracking()
@@ -86,6 +104,7 @@ public class PropertyService : IPropertyService
 
         await _context.Properties.AddAsync(newProperty, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
+        _cache.InvalidateRegions(CacheRegions.Properties);
 
         return ServiceResult<PropertyDto>.Created(newProperty.ToDto());
     }
@@ -99,6 +118,7 @@ public class PropertyService : IPropertyService
 
         existingProperty.UpdateFrom(dto);
         await _context.SaveChangesAsync(cancellationToken);
+        _cache.InvalidateRegions(CacheRegions.Properties);
 
         return ServiceResult.Ok();
     }
@@ -115,6 +135,7 @@ public class PropertyService : IPropertyService
 
         _context.Properties.Remove(property);
         await _context.SaveChangesAsync(cancellationToken);
+        _cache.InvalidateRegions(CacheRegions.Properties);
 
         return ServiceResult.Ok();
     }
