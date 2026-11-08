@@ -26,4 +26,6 @@ public class Agent
     public string LicenseNumber { get; set; } = string.Empty;
 
     public bool IsActive { get; set; } = true;
+
+    public string? IdentityUserId { get; set; }
 }

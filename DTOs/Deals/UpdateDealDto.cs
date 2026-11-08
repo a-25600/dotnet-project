@@ -20,4 +20,6 @@ public class UpdateDealDto
     [Required(ErrorMessage = "Статус є обов'язковим.")]
     [RegularExpression("^(?i)(Pending|Completed|Cancelled)$", ErrorMessage = "Статус може мати лише значення: Pending, Completed, Cancelled.")]
     public string Status { get; set; } = string.Empty;
+
+    public int? RealtorId { get; set; }
 }

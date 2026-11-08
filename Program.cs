@@ -1,6 +1,3 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Reflection;
-using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -13,10 +10,20 @@ using RealEstateApi.Repositories;
 using RealEstateApi.Services.Common;
 using RealEstateApi.Services.Implementations;
 using RealEstateApi.Services.Interfaces;
+using System.IdentityModel.Tokens.Jwt;
+using System.Reflection;
+using System.Text;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        options.JsonSerializerOptions.NumberHandling = JsonNumberHandling.AllowReadingFromString;
+    });
+
 builder.Services.AddEndpointsApiExplorer();
 
 // Swagger з підтримкою JWT Bearer
@@ -43,7 +50,7 @@ builder.Services.AddSwaggerGen(options =>
         Type = SecuritySchemeType.Http,
         Scheme = "bearer",
         BearerFormat = "JWT",
-        Description = "JWT, отриманий через POST /api/auth/login. Вставте лише сам токен."
+        Description = "JWT, отриманий через POST /api/auth/login."
     });
 
     options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
@@ -57,21 +64,20 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 // Налаштування ASP.NET Core Identity
 builder.Services.AddIdentityCore<ApplicationUser>(options =>
-    {
-        options.User.RequireUniqueEmail = true;
-        options.Password.RequiredLength = 8;
-        options.Password.RequireDigit = true;
-        options.Password.RequireLowercase = true;
-        options.Password.RequireUppercase = true;
-        options.Password.RequireNonAlphanumeric = false;
-    })
+{
+    options.User.RequireUniqueEmail = true;
+    options.Password.RequiredLength = 8;
+    options.Password.RequireDigit = true;
+    options.Password.RequireLowercase = true;
+    options.Password.RequireUppercase = true;
+    options.Password.RequireNonAlphanumeric = false;
+})
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>();
 
 // Налаштування JWT
 var jwtSection = builder.Configuration.GetSection("Jwt");
 builder.Services.Configure<JwtSettings>(jwtSection);
-
 var jwtSettings = jwtSection.Get<JwtSettings>()
     ?? throw new InvalidOperationException("Секцію 'Jwt' не знайдено в appsettings.json");
 
@@ -82,7 +88,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         options.MapInboundClaims = false;
-
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -99,6 +104,15 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+
+// Додавання політики CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader());
+});
 
 // Репозиторії та Unit of Work
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
@@ -123,12 +137,11 @@ builder.Services.AddHttpClient<ICurrencyService, CurrencyService>(client =>
 
 var app = builder.Build();
 
-// Автоматичне застосування міграцій та створення адміністратора й ролей
+// Автоматичне застосування міграцій
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     dbContext.Database.Migrate();
-
     await IdentitySeeder.SeedAsync(scope.ServiceProvider, app.Configuration);
 }
 
@@ -144,9 +157,12 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+// Підключення маршрутизації та CORS
+app.UseRouting();
+app.UseCors("AllowAll");
+
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-
 app.Run();

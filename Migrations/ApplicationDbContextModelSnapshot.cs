@@ -161,6 +161,9 @@ namespace RealEstateApi.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("IdentityUserId")
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 
@@ -259,6 +262,9 @@ namespace RealEstateApi.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("IdentityUserId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -287,7 +293,7 @@ namespace RealEstateApi.Migrations
                     b.Property<int>("PropertyId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("RealtorId")
+                    b.Property<int?>("RealtorId")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Status")
@@ -403,9 +409,7 @@ namespace RealEstateApi.Migrations
 
                     b.HasOne("RealEstateApi.Models.Agent", "Realtor")
                         .WithMany()
-                        .HasForeignKey("RealtorId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("RealtorId");
 
                     b.Navigation("Client");
 
