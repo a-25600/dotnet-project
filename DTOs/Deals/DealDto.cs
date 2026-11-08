@@ -33,7 +33,7 @@ public class DealDto
     /// <summary>
     /// Ідентифікатор ріелтора.
     /// </summary>
-    public int RealtorId { get; set; }
+    public int? RealtorId { get; set; }
 
     /// <summary>
     /// ПІБ ріелтора.

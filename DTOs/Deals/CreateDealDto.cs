@@ -22,11 +22,9 @@ public class CreateDealDto
     public int ClientId { get; set; }
 
     /// <summary>
-    /// Ідентифікатор відповідального ріелтора.
+    /// Ідентифікатор відповідального ріелтора (необов'язковий для нових заявок).
     /// </summary>
-    [Required(ErrorMessage = "RealtorId є обов'язковим.")]
-    [Range(1, int.MaxValue, ErrorMessage = "Некоректний RealtorId.")]
-    public int RealtorId { get; set; }
+    public int? RealtorId { get; set; }
 
     /// <summary>
     /// Сума угоди (має бути більша за 0).
