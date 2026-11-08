@@ -11,7 +11,6 @@ namespace RealEstateApi.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = AppRoles.UserOrAdministrator)]
 public class PropertiesController : ControllerBase
 {
     private readonly IPropertyService _propertyService;

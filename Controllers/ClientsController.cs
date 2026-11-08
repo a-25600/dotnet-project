@@ -10,7 +10,6 @@ namespace RealEstateApi.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = AppRoles.UserOrAdministrator)]
 public class ClientsController : ControllerBase
 {
     private readonly IClientService _clientService;
@@ -27,6 +26,7 @@ public class ClientsController : ControllerBase
     /// <param name="cancellationToken">Токен скасування операції.</param>
     /// <response code="200">Список клієнтів.</response>
     [HttpGet]
+    [Authorize(Roles = "Administrator,Agent")]
     [ProducesResponseType(typeof(List<ClientDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAllClients([FromQuery] ClientQueryParameters parameters, CancellationToken cancellationToken)
     {

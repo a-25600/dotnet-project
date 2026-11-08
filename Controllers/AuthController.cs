@@ -1,7 +1,10 @@
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using RealEstateApi.Data;
 using RealEstateApi.DTOs.Auth;
+using RealEstateApi.Models;
 using RealEstateApi.Services.Common;
 using RealEstateApi.Services.Interfaces;
 
@@ -15,19 +18,25 @@ namespace RealEstateApi.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly UserManager<ApplicationUser> _userManager;
+    private readonly RoleManager<IdentityRole> _roleManager;
+    private readonly ApplicationDbContext _context;
 
-    public AuthController(IAuthService authService)
+    public AuthController(
+        IAuthService authService,
+        UserManager<ApplicationUser> userManager,
+        RoleManager<IdentityRole> roleManager,
+        ApplicationDbContext context)
     {
         _authService = authService;
+        _userManager = userManager;
+        _roleManager = roleManager;
+        _context = context;
     }
 
     /// <summary>
-    /// Зареєструвати нового користувача системи з роллю User.
+    /// Зареєструвати нового користувача системи з роллю Client.
     /// </summary>
-    /// <param name="dto">Параметри реєстрації: email та пароль (від 8 символів, великі, малі літери та цифри).</param>
-    /// <response code="201">Користувача успішно створено, повернуто токен доступу.</response>
-    /// <response code="400">Некоректні вхідні дані або пароль не відповідає політиці безпеки.</response>
-    /// <response code="409">Користувач із вказаною електронною поштою вже існує.</response>
     [HttpPost("register")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(AuthResponseDto), StatusCodes.Status201Created)]
@@ -37,9 +46,33 @@ public class AuthController : ControllerBase
     {
         var result = await _authService.RegisterAsync(dto);
 
+        if (result.Status == ServiceStatus.Created)
+        {
+            var user = await _userManager.FindByEmailAsync(dto.Email);
+            if (user != null)
+            {
+                if (!await _roleManager.RoleExistsAsync("Client"))
+                    await _roleManager.CreateAsync(new IdentityRole("Client"));
+
+                if (!await _userManager.IsInRoleAsync(user, "Client"))
+                    await _userManager.AddToRoleAsync(user, "Client");
+
+                var client = new Client
+                {
+                    FullName = dto.FullName,
+                    Email = dto.Email,
+                    IdentityUserId = user.Id
+                };
+
+                _context.Clients.Add(client);
+                await _context.SaveChangesAsync();
+            }
+
+            return StatusCode(StatusCodes.Status201Created, result.Data);
+        }
+
         return result.Status switch
         {
-            ServiceStatus.Created => StatusCode(StatusCodes.Status201Created, result.Data),
             ServiceStatus.Conflict => Conflict(new { message = result.ErrorMessage }),
             _ => BadRequest(new { message = result.ErrorMessage })
         };
@@ -48,9 +81,6 @@ public class AuthController : ControllerBase
     /// <summary>
     /// Увійти в систему за допомогою email та пароля й отримати JWT-токен.
     /// </summary>
-    /// <param name="dto">Облікові дані для входу.</param>
-    /// <response code="200">Успішний вхід, повертається JWT-токен та список ролей.</response>
-    /// <response code="401">Невірна електронна пошта або пароль.</response>
     [HttpPost("login")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(AuthResponseDto), StatusCodes.Status200OK)]
@@ -68,10 +98,8 @@ public class AuthController : ControllerBase
     /// <summary>
     /// Отримати інформацію про поточного авторизованого користувача з токена.
     /// </summary>
-    /// <response code="200">Дані поточного користувача успішно отримано.</response>
-    /// <response code="401">Токен відсутній, недійсний або термін його дії закінчився.</response>
     [HttpGet("me")]
-    [Authorize(Roles = AppRoles.UserOrAdministrator)]
+    [Authorize]
     [ProducesResponseType(typeof(CurrentUserDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public IActionResult Me()
