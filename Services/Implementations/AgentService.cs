@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using RealEstateApi.Data;
 using RealEstateApi.DTOs.Agents;
@@ -10,13 +11,30 @@ namespace RealEstateApi.Services.Implementations;
 public class AgentService : IAgentService
 {
     private readonly ApplicationDbContext _context;
+    private readonly ICacheService _cache;
 
-    public AgentService(ApplicationDbContext context)
+    public AgentService(ApplicationDbContext context, ICacheService cache)
     {
         _context = context;
+        _cache = cache;
     }
 
-    public async Task<IReadOnlyList<AgentDto>> GetAllAsync(AgentQueryParameters parameters, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<AgentDto>> GetAllAsync(AgentQueryParameters parameters, CancellationToken cancellationToken = default) =>
+        _cache.GetOrCreateAsync(
+            CacheRegions.Agents,
+            $"list:{JsonSerializer.Serialize(parameters)}",
+            ct => LoadAllAsync(parameters, ct),
+            cancellationToken: cancellationToken);
+
+    public Task<ServiceResult<AgentDetailsDto>> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
+        _cache.GetOrCreateAsync(
+            CacheRegions.Agents,
+            $"details:{id}",
+            ct => LoadByIdAsync(id, ct),
+            result => result.IsSuccess,
+            cancellationToken);
+
+    private async Task<IReadOnlyList<AgentDto>> LoadAllAsync(AgentQueryParameters parameters, CancellationToken cancellationToken)
     {
         var query = _context.Agents.AsNoTracking().AsQueryable();
 
@@ -56,7 +74,7 @@ public class AgentService : IAgentService
         return agents.Select(a => a.ToDto()).ToList();
     }
 
-    public async Task<ServiceResult<AgentDetailsDto>> GetByIdAsync(int id, CancellationToken cancellationToken = default)
+    private async Task<ServiceResult<AgentDetailsDto>> LoadByIdAsync(int id, CancellationToken cancellationToken)
     {
         var agent = await _context.Agents
             .AsNoTracking()
@@ -90,6 +108,7 @@ public class AgentService : IAgentService
 
         await _context.Agents.AddAsync(newAgent, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
+        _cache.InvalidateRegions(CacheRegions.Agents);
 
         return ServiceResult<AgentDto>.Created(newAgent.ToDto());
     }
@@ -112,6 +131,7 @@ public class AgentService : IAgentService
 
         agent.UpdateFrom(dto);
         await _context.SaveChangesAsync(cancellationToken);
+        _cache.InvalidateRegions(CacheRegions.Agents, CacheRegions.Properties);
 
         return ServiceResult.Ok();
     }
@@ -128,6 +148,7 @@ public class AgentService : IAgentService
 
         _context.Agents.Remove(agent);
         await _context.SaveChangesAsync(cancellationToken);
+        _cache.InvalidateRegions(CacheRegions.Agents);
 
         return ServiceResult.Ok();
     }

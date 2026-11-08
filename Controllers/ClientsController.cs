@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using RealEstateApi.DTOs.Clients;
 using RealEstateApi.Services.Common;
 using RealEstateApi.Services.Interfaces;
-
+using Microsoft.AspNetCore.Authorization;
 namespace RealEstateApi.Controllers;
 
 /// <summary>
@@ -26,6 +26,7 @@ public class ClientsController : ControllerBase
     /// <param name="cancellationToken">Токен скасування операції.</param>
     /// <response code="200">Список клієнтів.</response>
     [HttpGet]
+    [Authorize(Roles = "Administrator,Agent")]
     [ProducesResponseType(typeof(List<ClientDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAllClients([FromQuery] ClientQueryParameters parameters, CancellationToken cancellationToken)
     {
@@ -121,6 +122,7 @@ public class ClientsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [Authorize(Roles = AppRoles.Administrator)]
     public async Task<IActionResult> DeleteClient(int id, CancellationToken cancellationToken)
     {
         var result = await _clientService.DeleteAsync(id, cancellationToken);

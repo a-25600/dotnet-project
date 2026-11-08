@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using RealEstateApi.DTOs.Currency;
 using RealEstateApi.Services.Common;
 using RealEstateApi.Services.Interfaces;
-
+using Microsoft.AspNetCore.Authorization;
 namespace RealEstateApi.Controllers;
 
 /// <summary>
@@ -10,6 +10,7 @@ namespace RealEstateApi.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[AllowAnonymous]
 public class CurrencyController : ControllerBase
 {
     private readonly ICurrencyService _currencyService;

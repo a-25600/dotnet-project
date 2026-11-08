@@ -11,10 +11,12 @@ namespace RealEstateApi.Services.Implementations;
 public class DealService : IDealService
 {
     private readonly ApplicationDbContext _context;
+    private readonly ICacheService _cache;
 
-    public DealService(ApplicationDbContext context)
+    public DealService(ApplicationDbContext context, ICacheService cache)
     {
         _context = context;
+        _cache = cache;
     }
 
     public async Task<IReadOnlyList<DealDto>> GetAllAsync(DealQueryParameters parameters, CancellationToken cancellationToken = default)
@@ -107,6 +109,7 @@ public class DealService : IDealService
 
         await _context.Deals.AddAsync(newDeal, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
+        _cache.InvalidateRegions(CacheRegions.Properties, CacheRegions.Agents);
 
         var resultDto = new DealDto
         {
@@ -158,6 +161,7 @@ public class DealService : IDealService
         }
 
         await _context.SaveChangesAsync(cancellationToken);
+        _cache.InvalidateRegions(CacheRegions.Properties, CacheRegions.Agents);
         return ServiceResult.Ok();
     }
 
@@ -183,6 +187,7 @@ public class DealService : IDealService
 
         _context.Deals.Remove(deal);
         await _context.SaveChangesAsync(cancellationToken);
+        _cache.InvalidateRegions(CacheRegions.Properties, CacheRegions.Agents);
 
         return ServiceResult.Ok();
     }
