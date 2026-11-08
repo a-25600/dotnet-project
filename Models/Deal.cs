@@ -18,9 +18,8 @@ public class Deal
     public int ClientId { get; set; }
     public Client? Client { get; set; }
 
-    [Required]
     [ForeignKey(nameof(Realtor))]
-    public int RealtorId { get; set; }
+    public int? RealtorId { get; set; }
     public Agent? Realtor { get; set; }
 
     [Required]
