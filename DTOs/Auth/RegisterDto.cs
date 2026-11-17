@@ -8,6 +8,12 @@ namespace RealEstateApi.DTOs.Auth;
 public class RegisterDto
 {
     /// <summary>
+    /// Ім'я користувача.
+    /// </summary>
+    [Required(ErrorMessage = "ПІБ є обов'язковим")]
+    [StringLength(100, ErrorMessage = "Ім'я не повинне перевищувати 100 символів")]
+    public string FullName { get; set; } = string.Empty;
+    /// <summary>
     /// Електронна пошта користувача.
     /// </summary>
     [Required(ErrorMessage = "Поле Email є обов'язковим для заповнення")]

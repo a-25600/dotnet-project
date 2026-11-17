@@ -14,6 +14,8 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Mvc;
+using RealEstateApi.Filters;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,6 +25,8 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
         options.JsonSerializerOptions.NumberHandling = JsonNumberHandling.AllowReadingFromString;
     });
+
+builder.Services.Configure<MvcOptions>(options => options.Filters.Add<ApiAuditLoggingFilter>());
 
 builder.Services.AddEndpointsApiExplorer();
 
@@ -88,6 +92,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         options.MapInboundClaims = false;
+        options.Events = JwtBearerLoggingEvents.Create();
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
