@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Агентство нерухомості</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <div id="authSection" class="container" style="max-width: 400px; margin-top: 100px;">
+        <h2 id="authTitle">Вхід до системи</h2>
+        <div id="authError" class="error-msg hidden"></div>
+
+        <div id="registerFields" class="hidden">
+            <label>ПІБ (Ім'я):</label>
+            <input type="text" id="regName" placeholder="Іванов Іван">
+        </div>
+
+        <label>Email:</label>
+        <input type="email" id="email" value="admin@admin.com">
+        <label>Пароль:</label>
+        <input type="password" id="password" value="Admin123!">
+
+        <button id="btnLogin" class="action-btn full-width" onclick="login()">Увійти</button>
+        <button id="btnRegister" class="action-btn full-width hidden" style="background-color: #17a2b8;" onclick="register()">Зареєструватися</button>
+
+        <p style="text-align: center; margin-top: 15px; font-size: 14px;">
+            <a href="#" id="authToggleLink" onclick="toggleAuthMode()" style="color: var(--primary); text-decoration: none;">Немає акаунту? Зареєструватися</a>
+        </p>
+    </div>
+
+    <div id="appSection" class="hidden">
+        <nav class="navbar">
+            <div class="logo">🏠 RealEstate API</div>
+            <div class="nav-links" id="navLinks">
+                <button onclick="switchTab('properties')" class="active" data-target="properties">Нерухомість</button>
+                <button onclick="switchTab('clients')" data-target="clients">Клієнти</button>
+                <button onclick="switchTab('agents')" data-target="agents">Рієлтори</button>
+                <button onclick="switchTab('deals')" data-target="deals">Угоди</button>
+            </div>
+            <div>
+                <span id="userEmailLabel" class="user-label"></span>
+                <button class="delete-btn" onclick="logout()">Вийти</button>
+            </div>
+        </nav>
+
+        <div class="container">
+            <div class="currency-widget" id="currencyWidget">
+                <strong>Курси НБУ:</strong> <span id="ratesLoading">Завантаження...</span>
+            </div>
+
+            <div id="tab-properties" class="tab-content">
+                <div class="tab-header">
+                    <h2>Об'єкти нерухомості</h2>
+                    <button class="action-btn" id="btnCreateProperty" onclick="openPropertyModal()">+ Додати об'єкт</button>
+                </div>
+                <table>
+                    <thead>
+                        <tr><th>ID</th><th>Адреса</th><th>Ціна</th><th>Кімнати</th><th>Статус</th><th>Дії</th></tr>
+                    </thead>
+                    <tbody id="propertiesTableBody"></tbody>
+                </table>
+            </div>
+
+            <div id="tab-clients" class="tab-content hidden">
+                <div class="tab-header">
+                    <h2>Клієнти</h2>
+                    <button class="action-btn" id="btnCreateClient" onclick="openClientModal()">+ Додати клієнта</button>
+                </div>
+                <table>
+                    <thead>
+                        <tr><th>ID</th><th>ПІБ</th><th>Email</th><th>Телефон</th><th>Дії</th></tr>
+                    </thead>
+                    <tbody id="clientsTableBody"></tbody>
+                </table>
+            </div>
+
+            <div id="tab-agents" class="tab-content hidden">
+                <div class="tab-header">
+                    <h2>Рієлтори</h2>
+                    <button class="action-btn" id="btnCreateAgent" onclick="openAgentModal()">+ Додати рієлтора</button>
+                </div>
+                <table>
+                    <thead>
+                        <tr><th>ID</th><th>ПІБ</th><th>Email</th><th>Телефон</th><th>Ліцензія</th><th>Статус</th><th>Дії</th></tr>
+                    </thead>
+                    <tbody id="agentsTableBody"></tbody>
+                </table>
+            </div>
+
+            <div id="tab-deals" class="tab-content hidden">
+                <div class="tab-header">
+                    <h2>Угоди</h2>
+                    <button class="action-btn" id="btnCreateDeal" onclick="openDealModal()">+ Створити угоду</button>
+                </div>
+                <table>
+                    <thead>
+                        <tr><th>ID</th><th>Об'єкт (ID)</th><th>Клієнт (ID)</th><th>Рієлтор (ID)</th><th>Ціна</th><th>Статус</th><th>Дії</th></tr>
+                    </thead>
+                    <tbody id="dealsTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="propertyModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="propertyModalTitle">Новий об'єкт</h3>
+                <button class="delete-btn" onclick="closeModal('propertyModal')">X</button>
+            </div>
+            <input type="hidden" id="propId">
+            <label>Адреса:</label>
+            <input type="text" id="propAddress">
+            <label>Ціна:</label>
+            <input type="number" id="propPrice">
+            <label>Кімнати:</label>
+            <input type="number" id="propRooms">
+            <label>Тип:</label>
+            <select id="propType">
+                <option value="Apartment">Квартира</option>
+                <option value="House">Будинок</option>
+                <option value="Commercial">Комерція</option>
+            </select>
+            <label>Статус:</label>
+            <select id="propStatus">
+                <option value="Available">Доступно</option>
+                <option value="Sold">Продано</option>
+                <option value="Rented">Орендовано</option>
+            </select>
+            <button class="action-btn full-width" onclick="saveProperty()">Зберегти</button>
+        </div>
+    </div>
+
+    <div id="clientModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="clientModalTitle">Новий клієнт</h3>
+                <button class="delete-btn" onclick="closeModal('clientModal')">X</button>
+            </div>
+            <input type="hidden" id="clientId">
+            <label>ПІБ:</label>
+            <input type="text" id="clientName">
+            <label>Email:</label>
+            <input type="email" id="clientEmail">
+            <label>Телефон:</label>
+            <input type="text" id="clientPhone">
+            <button class="action-btn full-width" onclick="saveClient()">Зберегти</button>
+        </div>
+    </div>
+
+    <div id="agentModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="agentModalTitle">Новий рієлтор</h3>
+                <button class="delete-btn" onclick="closeModal('agentModal')">X</button>
+            </div>
+            <input type="hidden" id="agentId">
+            <label>ПІБ:</label>
+            <input type="text" id="agentName">
+            <label>Email:</label>
+            <input type="email" id="agentEmail">
+            <label>Телефон:</label>
+            <input type="text" id="agentPhone">
+            <label>Номер ліцензії:</label>
+            <input type="text" id="agentLicense">
+            <label>Статус:</label>
+            <select id="agentActive">
+                <option value="true">Активний</option>
+                <option value="false">Неактивний</option>
+            </select>
+            <button class="action-btn full-width" onclick="saveAgent()">Зберегти</button>
+        </div>
+    </div>
+
+    <div id="dealModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="dealModalTitle">Нова угода</h3>
+                <button class="delete-btn" onclick="closeModal('dealModal')">X</button>
+            </div>
+            <input type="hidden" id="dealId">
+            <label>Об'єкт нерухомості:</label>
+            <select id="dealPropertyId"></select>
+            <label>Клієнт:</label>
+            <select id="dealClientId"></select>
+            <label>Рієлтор:</label>
+            <select id="dealAgentId"></select>
+            <label>Кінцева ціна:</label>
+            <input type="number" id="dealPrice">
+            <label>Статус:</label>
+            <select id="dealStatus">
+                <option value="Pending">В процесі (Pending)</option>
+                <option value="Completed">Завершено (Completed)</option>
+                <option value="Cancelled">Скасовано (Cancelled)</option>
+            </select>
+            <button class="action-btn full-width" onclick="saveDeal()">Зберегти</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
