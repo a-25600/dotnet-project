@@ -1,4 +1,22 @@
-const API_BASE = 'http://localhost:5064/api';
+const SERVICES = {
+    users: 'http://localhost:5001/api',
+    catalog: 'http://localhost:5002/api',
+    deals: 'http://localhost:5003/api'
+};
+
+function getApiUrl(endpoint) {
+    if (endpoint.startsWith('/auth') || endpoint.startsWith('/clients') || endpoint.startsWith('/agents')) {
+        return `${SERVICES.users}${endpoint}`;
+    }
+    if (endpoint.startsWith('/properties') || endpoint.startsWith('/currency')) {
+        return `${SERVICES.catalog}${endpoint}`;
+    }
+    if (endpoint.startsWith('/deals')) {
+        return `${SERVICES.deals}${endpoint}`;
+    }
+    throw new Error(`Невідомий маршрут: ${endpoint}`);
+}
+
 let isLoginMode = true;
 
 async function apiFetch(endpoint, method = 'GET', body = null) {
@@ -9,7 +27,7 @@ async function apiFetch(endpoint, method = 'GET', body = null) {
     const options = { method, headers };
     if (body) options.body = JSON.stringify(body);
 
-    const res = await fetch(`${API_BASE}${endpoint}`, options);
+    const res = await fetch(getApiUrl(endpoint), options);
 
     if (res.status === 401) { logout(); throw new Error("Unauthorized"); }
     if (res.status === 403) { alert("Недостатньо прав для виконання цієї дії!"); throw new Error("Forbidden"); }
@@ -45,7 +63,7 @@ function toggleAuthMode() {
 
 async function login() {
     try {
-        const res = await fetch(`${API_BASE}/auth/login`, {
+        const res = await fetch(getApiUrl('/auth/login'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -73,7 +91,7 @@ async function register() {
             email: document.getElementById('email').value,
             password: document.getElementById('password').value
         };
-        const res = await fetch(`${API_BASE}/auth/register`, {
+        const res = await fetch(getApiUrl('/auth/register'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)

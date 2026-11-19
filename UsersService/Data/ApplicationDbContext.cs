@@ -1,0 +1,62 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using UsersService.Models;
+
+namespace UsersService.Data;
+
+public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
+{
+    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
+    {
+    }
+    public DbSet<Agent> Agents { get; set; }
+    public DbSet<Client> Clients { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+
+        modelBuilder.Entity<Client>(entity =>
+        {
+            entity.ToTable("Clients");
+
+            entity.HasKey(c => c.Id);
+
+            entity.Property(c => c.FullName)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+            entity.Property(c => c.Email)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+            entity.Property(c => c.PhoneNumber)
+                  .IsRequired()
+                  .HasMaxLength(30);
+        });
+
+        modelBuilder.Entity<Agent>(entity =>
+        {
+            entity.ToTable("Agents");
+
+            entity.HasKey(a => a.Id);
+
+            entity.Property(a => a.FullName)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+            entity.Property(a => a.Email)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+            entity.Property(a => a.PhoneNumber)
+                  .IsRequired()
+                  .HasMaxLength(30);
+
+            entity.Property(a => a.LicenseNumber)
+                  .IsRequired()
+                  .HasMaxLength(50);
+        });
+    }
+}

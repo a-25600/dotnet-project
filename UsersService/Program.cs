@@ -1,0 +1,163 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
+using UsersService.Data;
+using UsersService.Middleware;
+using UsersService.Models;
+using UsersService.Repositories;
+using UsersService.Services.Common;
+using UsersService.Services.Implementations;
+using UsersService.Services.Interfaces;
+using System.IdentityModel.Tokens.Jwt;
+using System.Reflection;
+using System.Text;
+using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Mvc;
+using UsersService.Filters;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        options.JsonSerializerOptions.NumberHandling = JsonNumberHandling.AllowReadingFromString;
+    });
+
+builder.Services.Configure<MvcOptions>(options => options.Filters.Add<ApiAuditLoggingFilter>());
+
+builder.Services.AddEndpointsApiExplorer();
+
+// Swagger з підтримкою JWT Bearer
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Real Estate Agency REST API",
+        Version = "v1",
+        Description = "RESTful API для агентства нерухомості з JWT авторизацією та ролями."
+    });
+
+    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (File.Exists(xmlPath))
+    {
+        options.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
+    }
+
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        Description = "JWT, отриманий через POST /api/auth/login."
+    });
+
+    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+    {
+        [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+    });
+});
+
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Налаштування ASP.NET Core Identity
+builder.Services.AddIdentityCore<ApplicationUser>(options =>
+{
+    options.User.RequireUniqueEmail = true;
+    options.Password.RequiredLength = 8;
+    options.Password.RequireDigit = true;
+    options.Password.RequireLowercase = true;
+    options.Password.RequireUppercase = true;
+    options.Password.RequireNonAlphanumeric = false;
+})
+    .AddRoles<IdentityRole>()
+    .AddEntityFrameworkStores<ApplicationDbContext>();
+
+// Налаштування JWT
+var jwtSection = builder.Configuration.GetSection("Jwt");
+builder.Services.Configure<JwtSettings>(jwtSection);
+var jwtSettings = jwtSection.Get<JwtSettings>()
+    ?? throw new InvalidOperationException("Секцію 'Jwt' не знайдено в appsettings.json");
+
+if (jwtSettings.Key.Length < 32)
+    throw new InvalidOperationException("Jwt:Key має містити щонайменше 32 символи");
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.MapInboundClaims = false;
+        options.Events = JwtBearerLoggingEvents.Create();
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtSettings.Issuer,
+            ValidateAudience = true,
+            ValidAudience = jwtSettings.Audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Key)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(1),
+            RoleClaimType = "role",
+            NameClaimType = JwtRegisteredClaimNames.Email
+        };
+    });
+
+builder.Services.AddAuthorization();
+
+// Додавання політики CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader());
+});
+
+// Репозиторії та Unit of Work
+builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.Configure<CacheSettings>(builder.Configuration.GetSection("Caching"));
+builder.Services.AddSingleton<ICacheService, MemoryCacheService>();
+
+// Бізнес-сервіси
+builder.Services.AddScoped<IClientService, ClientService>();
+builder.Services.AddScoped<IAgentService, AgentService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+
+var app = builder.Build();
+
+// Автоматичне застосування міграцій
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    dbContext.Database.Migrate();
+    await IdentitySeeder.SeedAsync(scope.ServiceProvider, app.Configuration);
+}
+
+app.UseMiddleware<ExceptionMiddleware>();
+app.UseMiddleware<LoggingMiddleware>();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Real Estate API v1");
+    });
+}
+
+// Підключення маршрутизації та CORS
+app.UseRouting();
+app.UseCors("AllowAll");
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapControllers();
+app.Run();
